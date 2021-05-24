@@ -1,11 +1,7 @@
 package com.example.moviedb.ui.Fragments;
 
 import android.app.ProgressDialog;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.os.Bundle;
-import android.os.StrictMode;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -23,15 +19,13 @@ import com.example.moviedb.R;
 import com.example.moviedb.adapters.MovieAdapter;
 import com.example.moviedb.gs.MovieGS;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FirebaseFirestoreSettings;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -40,12 +34,12 @@ public class MovieFragment extends Fragment {
 
     SwipeRefreshLayout pullToRefresh;
     ArrayList<MovieGS> List;
-    ArrayList<String> titleMovie;
 
     // Firebase
     FirebaseFirestore mFirestore;
+    FirebaseFirestoreSettings settings;
 
-    String checkDataExist = "";
+    String img, title, checkDataExist = "";
 
     public static androidx.fragment.app.Fragment newInstance() {
         MovieFragment fragment = new MovieFragment();
@@ -58,6 +52,10 @@ public class MovieFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_movie, container, false);
 
         mFirestore = FirebaseFirestore.getInstance();
+        settings = new FirebaseFirestoreSettings.Builder()
+                .setPersistenceEnabled(true)
+                .build();
+        mFirestore.setFirestoreSettings(settings);
 
         pullToRefresh = view.findViewById(R.id.pullToRefresh);
 
@@ -97,9 +95,8 @@ public class MovieFragment extends Fragment {
                                     dataobj.getString("name")
                             ));
 
-                            String img = dataobj.getString("logo_path");
-                            String title = dataobj.getString("name");
-
+                            img = dataobj.getString("logo_path");
+                            title = dataobj.getString("name");
                             mFirestore.collection("movies")
                                     .whereEqualTo("title", dataobj.getString("name"))
                                     .get()
