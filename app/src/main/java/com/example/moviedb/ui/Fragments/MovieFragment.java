@@ -18,8 +18,11 @@ import com.android.volley.toolbox.Volley;
 import com.example.moviedb.R;
 import com.example.moviedb.adapters.MovieAdapter;
 import com.example.moviedb.gs.MovieGS;
+import com.example.moviedb.tools.internetConnection;
+import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreSettings;
+import com.google.firebase.firestore.MetadataChanges;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import org.json.JSONArray;
@@ -40,6 +43,7 @@ public class MovieFragment extends Fragment {
     FirebaseFirestoreSettings settings;
 
     String img, title, checkDataExist = "";
+    internetConnection connection = new internetConnection();
 
     public static androidx.fragment.app.Fragment newInstance() {
         MovieFragment fragment = new MovieFragment();
@@ -59,22 +63,30 @@ public class MovieFragment extends Fragment {
 
         pullToRefresh = view.findViewById(R.id.pullToRefresh);
 
-        //connection.handleSSLHandshake();
-        String url = "https://api.themoviedb.org/3/movie/550?api_key=5b35c58486dc9d8e393ad9418f546956";
-        List = new ArrayList<>();
-        sendAndRequestResponse(url, view);
-
-        //setting an setOnRefreshListener on the SwipeDownLayout
-        pullToRefresh.setOnRefreshListener(() -> {
-            List = new ArrayList<>();
+        if (!connection.isNetworkConnectionAvailable(getContext())){
+            dataOffline(view);
+        } else {
+            String url = "https://api.themoviedb.org/3/movie/550?api_key=5b35c58486dc9d8e393ad9418f546956";
             sendAndRequestResponse(url, view);
-            pullToRefresh.setRefreshing(false);
-        });
+
+            //setting an setOnRefreshListener on the SwipeDownLayout
+            pullToRefresh.setOnRefreshListener(() -> {
+                if (!connection.isNetworkConnectionAvailable(getContext())) {
+                    dataOffline(view);
+                    pullToRefresh.setRefreshing(false);
+                } else {
+                    sendAndRequestResponse(url, view);
+                    pullToRefresh.setRefreshing(false);
+                }
+
+            });
+        }
 
         return view;
     }
 
     private void sendAndRequestResponse(String url, View view) {
+        List = new ArrayList<>();
         final ProgressDialog progressDialog = new ProgressDialog(getContext());
         progressDialog.setMessage("Loading...");
         progressDialog.show();
@@ -90,10 +102,6 @@ public class MovieFragment extends Fragment {
                         JSONArray dataArray  = obj.getJSONArray("production_companies");
                         for (int i = 0; i < dataArray.length(); i++) {
                             JSONObject dataobj = dataArray.getJSONObject(i);
-                            List.add(new MovieGS(
-                                    dataobj.getString("logo_path"),
-                                    dataobj.getString("name")
-                            ));
 
                             img = dataobj.getString("logo_path");
                             title = dataobj.getString("name");
@@ -110,6 +118,11 @@ public class MovieFragment extends Fragment {
                                             }).addOnFailureListener(e -> Toast.makeText(getContext(), "No se crearon los datos correctamente", Toast.LENGTH_LONG).show());
                                         }
                                     });
+
+                            List.add(new MovieGS(
+                                    dataobj.getString("logo_path"),
+                                    dataobj.getString("name")
+                            ));
                         }
 
                         if (getActivity()!=null) {
@@ -128,5 +141,25 @@ public class MovieFragment extends Fragment {
             progressDialog.dismiss();
         });
         mRequestQueue.add(mStringRequest);
+    }
+
+    private void dataOffline (View view) {
+        List = new ArrayList<>();
+        mFirestore.collection("movies")
+                .addSnapshotListener(MetadataChanges.INCLUDE, (querySnapshot, e) -> {
+                    for (DocumentChange change : querySnapshot.getDocumentChanges()) {
+                        if (change.getType() == DocumentChange.Type.ADDED) {
+                            List.add(new MovieGS(
+                                    change.getDocument().getData().get("img").toString(),
+                                    change.getDocument().getData().get("title").toString()
+                            ));
+                        }
+                    }
+                    if (getActivity()!=null) {
+                        ListView listview = view.findViewById(R.id.listView);
+                        MovieAdapter adapter = new MovieAdapter(getActivity(), List);
+                        listview.setAdapter(adapter);
+                    }
+                });
     }
 }
