@@ -1,7 +1,11 @@
 package com.example.moviedb.ui.Fragments;
 
 import android.app.ProgressDialog;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.os.StrictMode;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,17 +22,30 @@ import com.android.volley.toolbox.Volley;
 import com.example.moviedb.R;
 import com.example.moviedb.adapters.MovieAdapter;
 import com.example.moviedb.gs.MovieGS;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 public class MovieFragment extends Fragment {
 
     SwipeRefreshLayout pullToRefresh;
     ArrayList<MovieGS> List;
+    ArrayList<String> titleMovie;
+
+    // Firebase
+    FirebaseFirestore mFirestore;
+
+    String checkDataExist = "";
 
     public static androidx.fragment.app.Fragment newInstance() {
         MovieFragment fragment = new MovieFragment();
@@ -39,6 +56,8 @@ public class MovieFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_movie, container, false);
+
+        mFirestore = FirebaseFirestore.getInstance();
 
         pullToRefresh = view.findViewById(R.id.pullToRefresh);
 
@@ -77,6 +96,23 @@ public class MovieFragment extends Fragment {
                                     dataobj.getString("logo_path"),
                                     dataobj.getString("name")
                             ));
+
+                            String img = dataobj.getString("logo_path");
+                            String title = dataobj.getString("name");
+
+                            mFirestore.collection("movies")
+                                    .whereEqualTo("title", dataobj.getString("name"))
+                                    .get()
+                                    .addOnCompleteListener(task -> {
+                                        for (QueryDocumentSnapshot document : task.getResult()) { checkDataExist = document.getData().get("img").toString(); }
+                                        if (checkDataExist == "") {
+                                            Map<String, Object> map = new HashMap<>();
+                                            map.put("img", img);
+                                            map.put("title", title);
+                                            mFirestore.collection("movies").add(map).addOnSuccessListener(documentReference -> {
+                                            }).addOnFailureListener(e -> Toast.makeText(getContext(), "No se crearon los datos correctamente", Toast.LENGTH_LONG).show());
+                                        }
+                                    });
                         }
 
                         if (getActivity()!=null) {
